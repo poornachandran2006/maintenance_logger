@@ -29,6 +29,7 @@ type Machine = {
 
 export default function MachinesPage() {
   const [darkMode, setDarkMode] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("machines");
 
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -52,12 +53,8 @@ export default function MachinesPage() {
 
   // search / filter / pagination
   const [query, setQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | Machine["status"]>(
-    "all"
-  );
-  const [sortBy, setSortBy] = useState<"name" | "last_active" | "status">(
-    "name"
-  );
+  const [filterStatus, setFilterStatus] = useState<"all" | Machine["status"]>("all");
+  const [sortBy, setSortBy] = useState<"name" | "last_active" | "status">("name");
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
@@ -119,10 +116,7 @@ export default function MachinesPage() {
 
   // Delete
   async function handleDelete(id: string) {
-    if (
-      !confirm("Delete this machine? This will unassign logs referencing it.")
-    )
-      return;
+    if (!confirm("Delete this machine? This will unassign logs referencing it.")) return;
     setDeletingId(id);
     try {
       await apiDelete(`/machines/${id}`);
@@ -222,6 +216,34 @@ export default function MachinesPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page]);
 
+  // Style helpers for label and input classes
+  const labelClass = darkMode
+    ? "text-white text-sm block mb-1"
+    : "text-black text-sm block mb-1";
+
+  const inputClass =
+    "px-3 py-2 rounded border w-full " +
+    (darkMode
+      ? "bg-gray-700 text-white placeholder-white placeholder-opacity-80 focus:ring-0 focus:outline-none"
+      : "bg-gray-200 text-black placeholder-black placeholder-opacity-80 focus:ring-0 focus:outline-none");
+
+  useEffect(() => {
+    setIsMounted(true);
+    setDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const handleDarkToggle = () => {
+    setDarkMode((prev) => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+      return next;
+    });
+  };
+
   return (
     <div
       className={`min-h-screen transition-colors duration-300 ${
@@ -304,21 +326,22 @@ export default function MachinesPage() {
 
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                setDarkMode(!darkMode);
-                document.documentElement.classList.toggle("dark");
-              }}
-              className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
-                darkMode ? "bg-blue-600" : "bg-gray-300"
-              }`}
-            >
-              <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                  darkMode ? "translate-x-6" : "translate-x-0"
+            {/* Only render the proper toggle after client hydration */}
+            {isMounted && (
+              <button
+                onClick={handleDarkToggle}
+                className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
+                  darkMode ? "bg-blue-600" : "bg-gray-300"
                 }`}
-              />
-            </button>
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                    darkMode ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            )}
+
             {darkMode ? (
               <SunIcon className="h-5 w-5 text-yellow-300" />
             ) : (
@@ -338,7 +361,8 @@ export default function MachinesPage() {
             <span>Dashboard</span>
           </Link>
 
-          <AuthButton darkMode={darkMode} />
+          {/* Hydration-safe AuthButton */}
+          {isMounted && <AuthButton darkMode={darkMode} />}
         </div>
       </nav>
 
@@ -355,7 +379,7 @@ export default function MachinesPage() {
                   setQuery(e.target.value);
                   setPage(1);
                 }}
-                className="pl-10 pr-4 py-2 rounded-lg border w-64 focus:outline-none"
+                className={`${inputClass} pl-10 pr-4 `}
               />
               <FiSearch className="absolute left-3 top-2.5 text-gray-400" />
             </div>
@@ -373,10 +397,13 @@ export default function MachinesPage() {
                 setViewing(null);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className="px-4 py-2 bg-white border rounded-lg"
+              className={`px-4 py-2 bg-gray-300 border rounded-lg ${
+                darkMode ? "bg-gray-600 text-white" : ""
+              }`}
             >
               Reset
             </button>
+
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2"
@@ -399,37 +426,33 @@ export default function MachinesPage() {
             className="grid lg:grid-cols-4 gap-4 items-end"
           >
             <div>
-              <label className="text-sm block mb-1">Name</label>
+              <label className={labelClass}>Name</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Enter machine name"
-                className={`px-3 py-2 rounded border w-full placeholder-gray-400 ${
-                  darkMode ? "placeholder-gray-300" : "placeholder-gray-500"
-                }`}
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="text-sm block mb-1">Code</label>
+              <label className={labelClass}>Code</label>
               <input
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="Machine code (optional)"
-                className={`px-3 py-2 rounded border w-full placeholder-gray-400 ${
-                  darkMode ? "placeholder-gray-300" : "placeholder-gray-500"
-                }`}
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="text-sm block mb-1">Status</label>
+              <label className={labelClass}>Status</label>
               <select
                 value={form.status}
                 onChange={(e) =>
                   setForm((s) => ({ ...s, status: e.target.value })) as any
                 }
-                className="px-3 py-2 rounded border w-full"
+                className={inputClass}
               >
                 <option value="idle">Idle</option>
                 <option value="running">Running</option>
@@ -438,26 +461,24 @@ export default function MachinesPage() {
             </div>
 
             <div>
-              <label className="text-sm block mb-1">Last active</label>
+              <label className={labelClass}>Last active</label>
               <input
                 type="datetime-local"
                 value={form.last_active_at}
                 onChange={(e) =>
                   setForm((s) => ({ ...s, last_active_at: e.target.value }))
                 }
-                className="px-3 py-2 rounded border w-full"
+                className={inputClass}
               />
             </div>
 
             <div className="lg:col-span-4">
-              <label className="text-sm block mb-1">Location</label>
+              <label className={labelClass}>Location</label>
               <input
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
                 placeholder="Enter machine location"
-                className={`px-3 py-2 rounded border w-full placeholder-gray-400 ${
-                  darkMode ? "placeholder-gray-300" : "placeholder-gray-500"
-                }`}
+                className={inputClass}
               />
             </div>
 
@@ -479,26 +500,26 @@ export default function MachinesPage() {
 
         {/* Filters */}
         <section className="mb-6 flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2 items-center">
             <select
               value={filterStatus}
               onChange={(e) => {
                 setFilterStatus(e.target.value as any);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded border"
+              className={inputClass}
+              style={{ maxWidth: 160 }}
             >
               <option value="all">All Status</option>
               <option value="idle">Idle</option>
               <option value="running">Running</option>
               <option value="maintenance">Maintenance</option>
             </select>
-
-            <label className="text-sm">Sort</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-2 rounded border"
+              className={inputClass}
+              style={{ maxWidth: 160 }}
             >
               <option value="name">Name</option>
               <option value="last_active">Last Active</option>
@@ -611,33 +632,6 @@ export default function MachinesPage() {
                   );
                 })}
               </div>
-
-              {/* pagination */}
-              <div className="mt-6 flex items-center justify-between">
-                <div className="text-sm text-gray-500">
-                  Showing{" "}
-                  {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} -{" "}
-                  {Math.min(page * pageSize, filtered.length)} of{" "}
-                  {filtered.length}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="px-3 py-2 rounded border"
-                  >
-                    Prev
-                  </button>
-                  <div className="px-3 py-2 rounded border bg-white/50">
-                    {page} / {totalPages}
-                  </div>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="px-3 py-2 rounded border"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
             </>
           )}
         </section>
@@ -737,35 +731,35 @@ export default function MachinesPage() {
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <label className="text-sm">Name</label>
+                <label className={labelClass}>Name</label>
                 <input
                   value={editing.name}
                   onChange={(e) =>
                     setEditing({ ...editing, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded border"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="text-sm">Code</label>
+                <label className={labelClass}>Code</label>
                 <input
                   value={editing.code || ""}
                   onChange={(e) =>
                     setEditing({ ...editing, code: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded border"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="text-sm">Status</label>
+                <label className={labelClass}>Status</label>
                 <select
                   value={editing.status}
                   onChange={(e) =>
                     setEditing({ ...editing, status: e.target.value as any })
                   }
-                  className="w-full px-3 py-2 rounded border"
+                  className={inputClass}
                 >
                   <option value="idle">Idle</option>
                   <option value="running">Running</option>
@@ -774,7 +768,7 @@ export default function MachinesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Last active</label>
+                <label className={labelClass}>Last active</label>
                 <input
                   type="datetime-local"
                   value={
@@ -785,18 +779,18 @@ export default function MachinesPage() {
                   onChange={(e) =>
                     setEditing({ ...editing, last_active_at: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded border"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="text-sm">Location</label>
+                <label className={labelClass}>Location</label>
                 <input
                   value={editing.location || ""}
                   onChange={(e) =>
                     setEditing({ ...editing, location: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded border"
+                  className={inputClass}
                 />
               </div>
 

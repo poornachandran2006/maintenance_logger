@@ -33,7 +33,7 @@ exports.getMachines = async (req, res) => {
 
 // GET SINGLE MACHINE
 exports.getMachineById = async (req, res) => {
-  try {
+    try {
    const machine = await Machine.findById(req.params.id).lean();
     if (!machine) return res.status(404).json({ error: "Machine not found" });
     res.json(machine);
