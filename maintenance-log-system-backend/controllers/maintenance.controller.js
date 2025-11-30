@@ -130,26 +130,107 @@ exports.getAllLogs = async (req, res) => {
     }
 };
 
-// CREATE a new maintenance log
-exports.createLog = async (req, res) => {
-    try {
-        const normalizedData = await normalizeLogData(req.body);
-        
-        const newLog = new MaintenanceLog(normalizedData);
-        await newLog.save();
 
-        res.status(201).json(formatLog(newLog));
-    } catch (error) {
-        if (error.message.includes('Invalid machine_id')) {
-            return res.status(400).json({ message: error.message });
-        }
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ message: error.message, errors: error.errors });
-        }
-        console.error("Error creating maintenance log:", error);
-        res.status(500).json({ message: 'Error creating maintenance log', error: error.message });
+const Attendance = require('../models/attendance.model'); // make sure path is correct
+
+exports.createLog = async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const machineId = body.machine_id || null;
+    const providedWorkerId = body.worker_id || null;
+
+    const normalizedMachineId = machineId === "" ? null : machineId;
+    const normalizedWorkerId = providedWorkerId === "" ? null : providedWorkerId;
+
+    // -----------------------------------------
+    // 1️⃣ REQUIRE MACHINE
+    // -----------------------------------------
+    if (!normalizedMachineId) {
+      return res.status(400).json({
+        message: "You must select a machine to create a log."
+      });
     }
+
+    // -----------------------------------------
+    // 2️⃣ FIND ACTIVE ATTENDANCE FOR THIS MACHINE
+    // -----------------------------------------
+    const activeAttendance = await Attendance.findOne({
+      machine_id: normalizedMachineId,
+      check_out: null
+    }).lean();
+
+    // -----------------------------------------
+    // 3️⃣ NO WORKER USING THIS MACHINE → REJECT
+    // -----------------------------------------
+    if (!activeAttendance) {
+      return res.status(400).json({
+        message: "No worker is currently checked in on this machine. You must check in a worker first."
+      });
+    }
+
+    // -----------------------------------------
+    // 4️⃣ IF FRONTEND PASSED A WORKER, IT MUST MATCH THE ONE CHECKED IN
+    // -----------------------------------------
+    if (
+      normalizedWorkerId &&
+      String(normalizedWorkerId) !== String(activeAttendance.worker_id)
+    ) {
+      return res.status(400).json({
+        message:
+          "This worker is not checked-in on this machine. Please select the worker who is using the machine."
+      });
+    }
+
+    // -----------------------------------------
+    // 5️⃣ ALWAYS USE ACTIVE ATTENDANCE WORKER
+    // (no auto attach from mismatched machine)
+    // -----------------------------------------
+    const finalWorkerId = activeAttendance.worker_id;
+
+    // Fetch worker name (optional)
+    let worker_name = null;
+    try {
+      const Users = require("../models/user.model");
+      const user = await Users.findById(finalWorkerId).select("name").lean();
+      worker_name = user?.name || null;
+    } catch (e) {
+      worker_name = null;
+    }
+
+    // -----------------------------------------
+    // 6️⃣ Build log document
+    // -----------------------------------------
+    const Maintenance = require("../models/maintenance.model");
+
+    const doc = {
+      machine_id: normalizedMachineId,
+      reported_by: finalWorkerId,
+      worker_name,
+      reported_at: body.reported_at ? new Date(body.reported_at) : new Date(),
+      completed_at: body.completed_at ? new Date(body.completed_at) : null,
+      type: body.type || "routine",
+      note: body.note || "",
+      reading_value:
+        body.reading_value !== undefined ? body.reading_value : null
+    };
+
+    const created = await Maintenance.create(doc);
+
+    return res.status(201).json(created);
+  } catch (err) {
+    console.error("createLog error:", err);
+    return res.status(500).json({
+      message: "Failed to create log",
+      error: String(err)
+    });
+  }
 };
+
+
+
+
+
 
 // GET log by ID (Fixes View/Edit modal loading)
 exports.getLogById = async (req, res) => {
