@@ -59,7 +59,7 @@ const analyticsRoutes = safeLoadRoute("./routes/analytics.route");
 const authRoutes = safeLoadRoute("./routes/auth.route");
 const fileRoutes = safeLoadRoute("./routes/file.route");
 const usersRoutes = safeLoadRoute("./routes/users.route");
-const shiftsRoutes = safeLoadRoute("./routes/shifts.route");
+const shiftsRoutes = safeLoadRoute("./routes/shifts.route.js");;
 const attendanceRoutes = safeLoadRoute("./routes/attendance.route");
 
 /* -------------------------------------------------------
@@ -112,7 +112,8 @@ if (usersRoutes && checkRouter("usersRoutes", usersRoutes))
   app.use("/api/users", usersRoutes);
 
 if (shiftsRoutes && checkRouter("shiftsRoutes", shiftsRoutes))
-  app.use("/api/shifts", shiftsRoutes);
+ app.use("/api/shifts", shiftsRoutes);
+
 
 if (attendanceRoutes && checkRouter("attendanceRoutes", attendanceRoutes))
   app.use("/api/attendance", attendanceRoutes);
@@ -149,3 +150,5 @@ mongoose
     console.error("❌ MongoDB connection error:", err);
     process.exit(1);
   });
+
+  console.log("Loaded shiftsRoutes =", shiftsRoutes ? "OK" : "FAILED");
