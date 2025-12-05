@@ -44,7 +44,7 @@ function safeLoadRoute(path) {
   try {
     return require(path);
   } catch (err) {
-    console.log("⚠️ Route not found:", path);
+    console.log("⚠️ Route not found or failed to load:", path);
     return null;
   }
 }
@@ -56,10 +56,10 @@ function safeLoadRoute(path) {
 const maintenanceRoutes = safeLoadRoute("./routes/maintenance.route");
 const machinesRoutes = safeLoadRoute("./routes/machines.route");
 const analyticsRoutes = safeLoadRoute("./routes/analytics.route");
-const authRoutes = safeLoadRoute("./routes/auth.route");
+const authRoutes = safeLoadRoute("./routes/auth.route");   // Updated
 const fileRoutes = safeLoadRoute("./routes/file.route");
 const usersRoutes = safeLoadRoute("./routes/users.route");
-const shiftsRoutes = safeLoadRoute("./routes/shifts.route.js");;
+const shiftsRoutes = safeLoadRoute("./routes/shifts.route.js");
 const attendanceRoutes = safeLoadRoute("./routes/attendance.route");
 
 /* -------------------------------------------------------
@@ -102,8 +102,8 @@ if (machinesRoutes && checkRouter("machinesRoutes", machinesRoutes))
 if (analyticsRoutes && checkRouter("analyticsRoutes", analyticsRoutes))
   app.use("/api/analytics", analyticsRoutes);
 
-if (authRoutes && checkRouter("authRoutes", authRoutes))
-  app.use("/api/auth", authRoutes);
+if (authRoutes && checkRouter("authRoutes", authRoutes)) 
+  app.use("/api/auth", authRoutes);       // Updated
 
 if (fileRoutes && checkRouter("fileRoutes", fileRoutes))
   app.use("/api/file", fileRoutes);
@@ -112,8 +112,7 @@ if (usersRoutes && checkRouter("usersRoutes", usersRoutes))
   app.use("/api/users", usersRoutes);
 
 if (shiftsRoutes && checkRouter("shiftsRoutes", shiftsRoutes))
- app.use("/api/shifts", shiftsRoutes);
-
+  app.use("/api/shifts", shiftsRoutes);
 
 if (attendanceRoutes && checkRouter("attendanceRoutes", attendanceRoutes))
   app.use("/api/attendance", attendanceRoutes);
@@ -151,4 +150,4 @@ mongoose
     process.exit(1);
   });
 
-  console.log("Loaded shiftsRoutes =", shiftsRoutes ? "OK" : "FAILED");
+console.log("Loaded shiftsRoutes =", shiftsRoutes ? "OK" : "FAILED");

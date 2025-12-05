@@ -1,22 +1,23 @@
-const express = require('express');
+// routes/auth.route.js
+const express = require("express");
 const router = express.Router();
-const { signup, signin, logout } = require('../controllers/auth.controller');
 
-router.post('/signup', signup);
-router.post('/signin', signin);
-router.post('/logout', logout);
-router.get('/status', (req, res) => {
-    try {
-        const isAuthenticated = req.isAuthenticated() || req.session.user;
+const authController = require("../controllers/auth.controller");
+const authMiddleware = require("../middleware/auth.middleware");
 
-        res.status(200).json({
-            authenticated: isAuthenticated,
-            user: req.user || req.session.user
-        });
-    } catch (err) {
-        console.error('Status check error:', err);
-        res.status(500).json({ error: 'Unable to check auth status' });
-    }
+// Public routes
+router.post("/register", authController.register);
+router.post("/login", authController.login);
+
+// 🔹 Logout route (frontend calls this)
+router.post("/logout", authController.logout);
+
+// 🔹 Auth status (frontend calls this in AuthButton)
+router.get("/status", authMiddleware, (req, res) => {
+  res.json({ authenticated: true, user: req.user });
 });
+
+// Protected route - returns logged-in user info
+router.get("/me", authMiddleware, authController.me);
 
 module.exports = router;

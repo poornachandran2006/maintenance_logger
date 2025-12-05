@@ -1,15 +1,16 @@
 // backend/routes/shifts.route.js
 const express = require("express");
 const router = express.Router();
+
+const auth = require("../middleware/auth.middleware");
 const controller = require("../controllers/shifts.controller");
 
-// Only allow GET
-router.get("/get", controller.getShifts);
+// GET shifts (protected)
+router.get("/get", auth, controller.getShifts);
 
-// If you previously had create/update/delete endpoints,
-// route them to forbidModify (safe fallback)
-router.post("/create", controller.forbidModify);
-router.put("/update/:id", controller.forbidModify);
-router.delete("/:id", controller.forbidModify);
+// CREATE, UPDATE, DELETE blocked but still protected
+router.post("/create", auth, controller.forbidModify);
+router.put("/update/:id", auth, controller.forbidModify);
+router.delete("/:id", auth, controller.forbidModify);
 
 module.exports = router;

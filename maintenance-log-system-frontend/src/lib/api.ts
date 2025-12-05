@@ -1,69 +1,92 @@
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://maintenance-log-system-backend-1.onrender.com/api";
+// src/lib/api.ts
+"use client";
 
-/**
- * Convert server response into useful error message
- */
-async function handleResponse(res: Response) {
+// ----------------------------------------------------
+// BACKEND BASE URL
+// ----------------------------------------------------
+export const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+
+// ----------------------------------------------------
+// HANDLE API RESPONSES
+// ----------------------------------------------------
+async function handleResponse<T = any>(res: Response): Promise<T> {
   if (!res.ok) {
-    let payload = {};
-
+    let payload: any = {};
     try {
       payload = await res.json();
-    } catch (e) {
-      // ignore JSON parsing error
-    }
+    } catch {}
 
-    const msg =
-      // backend explicit message
-      (payload as any).message ||
-      (payload as any).error ||
-      (payload as any).details ||
-      // fallback to HTTP status text
+    const message =
+      payload?.message ||
+      payload?.error ||
       res.statusText ||
-      "API request failed";
+      "API Request Failed";
 
-    throw new Error(msg);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
   }
 
-  // success → return parsed JSON
-  return res.json();
+  if (res.status === 204) return null as T;
+
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null as T;
+  }
 }
 
-export async function apiGet(path: string) {
+// ----------------------------------------------------
+// GET TOKEN FROM LOCAL STORAGE
+// ----------------------------------------------------
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("token");
+}
+
+// ----------------------------------------------------
+// CORE REQUEST HANDLER
+// ----------------------------------------------------
+async function request<T = any>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: "include",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
   });
-  return handleResponse(res);
+
+  return handleResponse<T>(res);
 }
 
-export async function apiPost(path: string, body: any) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+// ----------------------------------------------------
+// PUBLIC HELPER FUNCTIONS
+// ----------------------------------------------------
+export function apiGet<T = any>(path: string): Promise<T> {
+  return request<T>(path, { method: "GET" });
+}
+
+export function apiPost<T = any>(path: string, body?: any): Promise<T> {
+  return request<T>(path, {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   });
-
-  return handleResponse(res);
 }
 
-export async function apiPut(path: string, body: any) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+export function apiPut<T = any>(path: string, body?: any): Promise<T> {
+  return request<T>(path, {
     method: "PUT",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   });
-
-  return handleResponse(res);
 }
 
-export async function apiDelete(path: string) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  return handleResponse(res);
+export function apiDelete<T = any>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE" });
 }

@@ -14,6 +14,8 @@ import {
 import { LayoutDashboard, MoonIcon, SunIcon } from "lucide-react";
 import AuthButton from "../../_components/auth-button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import useAuthGuard from "@/lib/useAuthGuard";
+
 
 type Machine = {
   _id?: string;
@@ -28,6 +30,7 @@ type Machine = {
 };
 
 export default function MachinesPage() {
+  useAuthGuard();
   const [darkMode, setDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("machines");

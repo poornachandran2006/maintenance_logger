@@ -2,14 +2,19 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import {
   FiDatabase,
   FiPlus,
   FiTrash2,
   FiEdit2,
   FiSearch,
+  FiLogOut,
+  FiActivity,
 } from "react-icons/fi";
-import { LayoutDashboard, MoonIcon, SunIcon } from "lucide-react";
+import { MoonIcon, SunIcon } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
+
 import AuthButton from "@/app/_components/auth-button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 
@@ -18,7 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import useAuthGuard from "@/lib/useAuthGuard";
 
+// =====================
+// TYPES
+// =====================
 type Machine = {
   _id?: string;
   id?: string;
@@ -34,7 +43,8 @@ type Worker = {
 };
 
 type Log = {
-  id: string;
+  id?: string;
+  _id?: string;
   machine_id?: string | null;
   machine_name?: string | null;
   worker_id?: string | null;
@@ -49,20 +59,28 @@ type Log = {
 };
 
 export default function LogsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // 🔐 Auth guard (protects page and gives current user)
+  const { user, loading: authLoading } = useAuthGuard();
+
+  // UI state
   const [darkMode, setDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState("logs");
 
+  // Data state
   const [logs, setLogs] = useState<Log[]>([]);
   const [machinesList, setMachinesList] = useState<Machine[]>([]);
   const [workersList, setWorkersList] = useState<Worker[]>([]);
   const [attendanceList, setAttendanceList] = useState<any[]>([]);
 
-  const [loading, setLoading] = useState(false);
+  // Flags
+  const [logsLoading, setLogsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // CREATE LOG FORM
+  // Create Log Form
   const [form, setForm] = useState({
     machine_id: "",
     type: "routine",
@@ -71,7 +89,7 @@ export default function LogsPage() {
     completed_at: "",
   });
 
-  // Filter / Sort / Pagination
+  // Filters / Pagination
   const [filterType, setFilterType] = useState("all");
   const [filterMachine, setFilterMachine] = useState("all");
   const [query, setQuery] = useState("");
@@ -81,32 +99,48 @@ export default function LogsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
-  // Modals
+  // Modals (if you implement them later)
   const [viewing, setViewing] = useState<Log | null>(null);
   const [editing, setEditing] = useState<Log | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // MOUNT = TRUE
+  // ===========================================================
+  // INITIAL MOUNT (for dark mode hydration-safe)
+  // ===========================================================
   useEffect(() => {
     setIsMounted(true);
     setDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  // ===========================================================
+  // FETCH DATA (AFTER AUTH IS READY)
+  // ===========================================================
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return; // if unauthenticated, useAuthGuard will redirect
+
+    // Once user is known and authenticated, load all data
     fetchAll();
     fetchMachines();
     fetchWorkers();
     fetchAttendance();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
-  // FETCH MAINTENANCE LOGS
+  // FETCH LOGS
   async function fetchAll() {
-    setLoading(true);
+    setLogsLoading(true);
+    setError(null);
     try {
-      const data = await apiGet("/maintenance/get");
+      const data = await apiGet<Log[]>("/maintenance/get");
       if (Array.isArray(data)) setLogs(data);
-    } catch (err) {
-      console.log(err);
+      else setLogs([]);
+    } catch (err: any) {
+      console.error("fetchAll logs error:", err);
+      setError(err.message || "Failed to load logs");
       setLogs([]);
     } finally {
-      setLoading(false);
+      setLogsLoading(false);
     }
   }
 
@@ -114,9 +148,12 @@ export default function LogsPage() {
   async function fetchMachines() {
     try {
       const m =
-        (await apiGet("/machines/get").catch(() => apiGet("/machines"))) || [];
-      setMachinesList(m);
-    } catch {
+        (await apiGet<Machine[]>("/machines/get").catch(() =>
+          apiGet<Machine[]>("/machines")
+        )) || [];
+      setMachinesList(Array.isArray(m) ? m : []);
+    } catch (err) {
+      console.error("fetchMachines error:", err);
       setMachinesList([]);
     }
   }
@@ -124,9 +161,10 @@ export default function LogsPage() {
   // FETCH WORKERS
   async function fetchWorkers() {
     try {
-      const w = await apiGet("/users/get");
-      setWorkersList(w || []);
-    } catch {
+      const w = await apiGet<Worker[]>("/users/get");
+      setWorkersList(Array.isArray(w) ? w : []);
+    } catch (err) {
+      console.error("fetchWorkers error:", err);
       setWorkersList([]);
     }
   }
@@ -134,111 +172,100 @@ export default function LogsPage() {
   // FETCH ATTENDANCE
   async function fetchAttendance() {
     try {
-      const a = await apiGet("/attendance/get");
-      setAttendanceList(a || []);
-    } catch {
+      const a = await apiGet<any[]>("/attendance/get");
+      setAttendanceList(Array.isArray(a) ? a : []);
+    } catch (err) {
+      console.error("fetchAttendance error:", err);
       setAttendanceList([]);
     }
   }
 
-  // GET ACTIVE ATTENDANCE (Auto-fill worker + machine)
-  function getActiveAttendance() {
-    return attendanceList.find((a) => !a.check_out) || null;
-  }
-
+  // ===========================================================
   // CREATE LOG
-async function handleCreate(e: React.FormEvent) {
-  e.preventDefault();
-  setSaving(true);
+  // ===========================================================
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
 
-  try {
-    const active = getActiveAttendance();
+    try {
+      const payload: any = {
+        machine_id: form.machine_id || null,
+        type: form.type,
+        note: form.note || "",
+        completed_at: form.completed_at || null,
+      };
 
-    let workerToAttach = null;
-    let shiftToAttach = null;
-
-    if (active && active.machine_id === form.machine_id) {
-      workerToAttach = active.worker_id;
-      shiftToAttach = active.shift_id;
-    }
-
-    const payload: any = {
-      machine_id: form.machine_id || null,
-      worker_id: workerToAttach,
-      shift_id: shiftToAttach,
-      type: form.type,
-      note: form.note || "",
-      completed_at: form.completed_at || null,
-    };
-
-    if (form.reading_value.trim()) {
-      try {
-        payload.reading_value = JSON.parse(form.reading_value);
-      } catch {
-        payload.reading_value = form.reading_value;
+      if (form.reading_value.trim()) {
+        try {
+          payload.reading_value = JSON.parse(form.reading_value);
+        } catch {
+          payload.reading_value = form.reading_value;
+        }
       }
+
+      const created = await apiPost<Log>("/maintenance/create", payload);
+      setLogs((prev) => [created, ...prev]);
+
+      // Reset form
+      setForm({
+        machine_id: "",
+        type: "routine",
+        note: "",
+        reading_value: "",
+        completed_at: "",
+      });
+    } catch (err: any) {
+      console.error("create log error:", err);
+      setError(err.message || "Failed to create log");
+    } finally {
+      setSaving(false);
     }
-
-    const created = await apiPost("/maintenance/create", payload);
-
-    setLogs((l) => [created, ...l]);
-
-    setForm({
-      machine_id: "",
-      type: "routine",
-      note: "",
-      reading_value: "",
-      completed_at: "",
-    });
-  } catch (err: any) {
-    const msg =
-      err?.response?.data?.message ||
-      err?.response?.data?.error ||
-      err?.message ||
-      "Failed to create log";
-
-    alert(msg); // ONLY alert popup — no UI message
-  } finally {
-    setSaving(false);
   }
-}
 
-
-
+  // ===========================================================
   // DELETE LOG
+  // ===========================================================
   async function handleDelete(id: string) {
     if (!confirm("Delete this log?")) return;
     setDeletingId(id);
 
     try {
       await apiDelete(`/maintenance/${id}`);
-      setLogs((l) => l.filter((x) => x.id !== id));
+      setLogs((prev) => prev.filter((x) => (x.id || x._id) !== id));
+    } catch (err: any) {
+      console.error("delete log error:", err);
+      alert(err.message || "Failed to delete log");
     } finally {
       setDeletingId(null);
     }
   }
 
-  // OPEN EDIT
+  // ===========================================================
+  // EDIT LOG
+  // ===========================================================
   function openEdit(log: Log) {
     setEditing({
       ...log,
       reading_value: log.reading_value
         ? JSON.stringify(log.reading_value, null, 2)
         : "",
-      completed_at: log.completed_at
-        ? log.completed_at.slice(0, 16)
-        : "",
+      completed_at: log.completed_at ? log.completed_at.slice(0, 16) : "",
     });
   }
 
-  // SAVE EDIT
   async function saveEdit() {
     if (!editing) return;
 
     setSaving(true);
+    setError(null);
 
     try {
-      const payload: any = { ...editing, machine_id: editing.machine_id || null };
+      const payload: any = {
+        ...editing,
+        machine_id: editing.machine_id || null,
+      };
+
       delete payload.id;
 
       if (typeof editing.reading_value === "string") {
@@ -249,19 +276,29 @@ async function handleCreate(e: React.FormEvent) {
         }
       }
 
-      const updated = await apiPut(`/maintenance/update/${editing.id}`, payload);
+      const updated = await apiPut<Log>(
+        `/maintenance/update/${editing._id}`,
+        payload
+      );
 
       setLogs((old) =>
-        old.map((x) => (x.id === updated.id ? updated : x))
+        old.map((x) =>
+          (x._id || x.id) === (updated._id || updated.id) ? updated : x
+        )
       );
 
       setEditing(null);
+    } catch (err: any) {
+      console.error("update log error:", err);
+      setError(err.message || "Failed to update log");
     } finally {
       setSaving(false);
     }
   }
 
-  // SEARCH + FILTER + SORT
+  // ===========================================================
+  // SEARCH + FILTER + SORT + PAGINATION
+  // ===========================================================
   const filtered = useMemo(() => {
     let list = [...logs];
 
@@ -299,14 +336,16 @@ async function handleCreate(e: React.FormEvent) {
 
   useEffect(() => {
     if (page > totalPages) setPage(1);
-  }, [totalPages]);
+  }, [totalPages, page]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page]);
 
-  // FORMATTERS
+  // ===========================================================
+  // HELPERS
+  // ===========================================================
   const workerName = (id?: string | null) => {
     const w = workersList.find((x) => x.id === id || x._id === id);
     return w?.name || w?.email || "N/A";
@@ -329,7 +368,7 @@ async function handleCreate(e: React.FormEvent) {
 
   const inputClass =
     "px-3 py-2 rounded border w-full " +
-    (darkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-black");
+    (darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-gray-100 text-black border-gray-300");
 
   const handleDarkToggle = () => {
     setDarkMode((prev) => {
@@ -340,133 +379,156 @@ async function handleCreate(e: React.FormEvent) {
     });
   };
 
+  const isActiveLink = (href: string) => pathname === href;
+
+  const handleLogout = async () => {
+    try {
+      await apiPost("/auth/logout");
+      router.push("/signin");
+    } catch (err: any) {
+      console.error("logout error:", err);
+      alert(err.message || "Logout failed");
+    }
+  };
+
+  // ===========================================================
+  // BLOCK RENDER WHILE AUTH CHECKING
+  // ===========================================================
+  if (authLoading) {
+    return null;
+  }
+
+  // ===========================================================
+  // UI
+  // ===========================================================
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${
-        darkMode ? "dark bg-gray-900 text-white" : "bg-gray-50 text-black"
+      className={`min-h-screen flex transition-colors duration-300 ${
+        darkMode ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-900"
       }`}
     >
-      {/* NAVBAR */}
-      <nav
-        className={`border-b fixed w-full px-6 py-4 flex items-center justify-between z-50 ${
-          darkMode
-            ? "bg-gray-800/50 border-gray-700"
-            : "bg-white/80 border-gray-200"
+      {/* SIDEBAR */}
+      <aside
+        className={`w-64 flex flex-col border-r ${
+          darkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
         }`}
       >
-        <div className="flex items-center space-x-8">
-          <div className="flex items-center">
-            <div className="bg-blue-500 p-2 rounded-lg">
-              <FiDatabase className="h-6 w-6 text-white" />
-            </div>
-            <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">
-              MaintenanceLog
-            </span>
+        <div className="px-4 py-4 flex items-center gap-3 border-b border-gray-700/40">
+          <div className="bg-blue-500 p-2 rounded-lg">
+            <FiActivity className="h-6 w-6 text-white" />
           </div>
-
-          <div className="hidden md:flex space-x-6">
-            <Link
-              href="/"
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                activeTab === "home"
-                  ? "text-blue-500 font-medium"
-                  : darkMode
-                  ? "hover:text-gray-300"
-                  : "hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("home")}
-            >
-              Home
-            </Link>
-
-            <Link
-              href="/features"
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                activeTab === "features"
-                  ? "text-blue-500 font-medium"
-                  : darkMode
-                  ? "hover:text-gray-300"
-                  : "hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("features")}
-            >
-              Features
-            </Link>
-
-            <Link
-              href="/solutions"
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                activeTab === "solutions"
-                  ? "text-blue-500 font-medium"
-                  : darkMode
-                  ? "hover:text-gray-300"
-                  : "hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("solutions")}
-            >
-              Solutions
-            </Link>
-
-            <Link
-              href="/pricing"
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                activeTab === "pricing"
-                  ? "text-blue-500 font-medium"
-                  : darkMode
-                  ? "hover:text-gray-300"
-                  : "hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("pricing")}
-            >
-              Pricing
-            </Link>
+          <div>
+            <div className="text-lg font-bold">MaintenanceLog</div>
+            <div className="text-xs text-gray-400">
+              {user?.role === "admin" ? "Admin Panel" : "Worker Panel"}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            {isMounted && (
-              <button
-                onClick={handleDarkToggle}
-                className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
-                  darkMode ? "bg-blue-600" : "bg-gray-300"
-                }`}
-              >
-                <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                    darkMode ? "translate-x-6" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            )}
-
-            {darkMode ? (
-              <SunIcon className="h-5 w-5 text-yellow-300" />
-            ) : (
-              <MoonIcon className="h-5 w-5 text-gray-600" />
-            )}
+        <div className="px-4 py-4 flex items-center justify-between border-b border-gray-800/40">
+          <div className="text-sm">
+            <div className="font-medium">{user?.name}</div>
+            <div className="text-xs text-gray-400">{user?.email}</div>
           </div>
 
+          {isMounted && (
+            <button
+              onClick={handleDarkToggle}
+              className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
+                darkMode ? "bg-blue-600" : "bg-gray-300"
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                  darkMode ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </button>
+          )}
+        </div>
+
+        <nav className="flex-1 px-2 py-4 space-y-1 text-sm">
           <Link
             href="/dashboard"
-            className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
-              darkMode
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600 text-white"
+            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer ${
+              isActiveLink("/dashboard")
+                ? "bg-blue-600 text-white"
+                : darkMode
+                ? "hover:bg-gray-800"
+                : "hover:bg-gray-100"
             }`}
           >
-            <LayoutDashboard className="h-5 w-5" />
+            <LayoutDashboard className="h-4 w-4" />
             <span>Dashboard</span>
           </Link>
 
-          {isMounted && <AuthButton darkMode={darkMode} />}
-        </div>
-      </nav>
+          <Link
+            href="/solutions/logs"
+            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer ${
+              isActiveLink("/solutions/logs")
+                ? "bg-blue-600 text-white"
+                : darkMode
+                ? "hover:bg-gray-800"
+                : "hover:bg-gray-100"
+            }`}
+          >
+            <FiDatabase className="h-4 w-4" />
+            <span>Logs</span>
+          </Link>
 
-      <main className="pt-28 px-6 max-w-6xl mx-auto">
+          <Link
+            href="/solutions/machines"
+            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer ${
+              isActiveLink("/solutions/machines")
+                ? "bg-blue-600 text-white"
+                : darkMode
+                ? "hover:bg-gray-800"
+                : "hover:bg-gray-100"
+            }`}
+          >
+            <FiActivity className="h-4 w-4" />
+            <span>Machines</span>
+          </Link>
+
+          <Link
+            href="/solutions/shifts"
+            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer ${
+              isActiveLink("/solutions/shifts")
+                ? "bg-blue-600 text-white"
+                : darkMode
+                ? "hover:bg-gray-800"
+                : "hover:bg-gray-100"
+            }`}
+          >
+            <FiActivity className="h-4 w-4" />
+            <span>Shifts & Attendance</span>
+          </Link>
+        </nav>
+
+        <div className="px-4 py-4 border-t border-gray-800/40 flex items-center justify-between">
+          {isMounted && <AuthButton darkMode={darkMode} />}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-400"
+          >
+            <FiLogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 px-8 py-6 overflow-y-auto">
         {/* HEADER SECTION */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Maintenance Logs</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Maintenance Logs</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {user?.role === "admin"
+                ? "Viewing all logs from workers and machines."
+                : "Viewing your maintenance logs across assigned machines."}
+            </p>
+          </div>
 
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -481,24 +543,19 @@ async function handleCreate(e: React.FormEvent) {
               />
               <FiSearch className="absolute left-3 top-2.5 text-gray-400" />
             </div>
-
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2"
-            >
-              <FiPlus /> New Log
-            </button>
           </div>
         </div>
 
         {/* CREATE LOG FORM */}
         <section
-          className={`p-6 rounded-xl mb-8 ${
+          className={`p-6 rounded-xl mb-8 border ${
             darkMode
-              ? "bg-gray-800 border border-gray-700"
-              : "bg-white border border-gray-200"
+              ? "bg-gray-900 border-gray-800"
+              : "bg-white border-gray-200"
           }`}
         >
+          <h2 className="text-lg font-semibold mb-4">Create Log Entry</h2>
+
           <form onSubmit={handleCreate} className="grid lg:grid-cols-4 gap-4">
             <div>
               <Label className={labelClass}>Machine</Label>
@@ -536,7 +593,7 @@ async function handleCreate(e: React.FormEvent) {
             </div>
 
             <div>
-              <Label className={labelClass}>Reading (JSON) — optional</Label>
+              <Label className={labelClass}>Reading (JSON)</Label>
               <Input
                 value={form.reading_value}
                 onChange={(e: any) =>
@@ -548,7 +605,7 @@ async function handleCreate(e: React.FormEvent) {
             </div>
 
             <div>
-              <Label className={labelClass}>Completed At (optional)</Label>
+              <Label className={labelClass}>Completed At</Label>
               <input
                 type="datetime-local"
                 value={form.completed_at}
@@ -621,10 +678,10 @@ async function handleCreate(e: React.FormEvent) {
 
         {/* LOGS GRID */}
         <section>
-          {loading ? (
+          {logsLoading ? (
             <div
               className={`p-6 rounded-lg border text-center ${
-                darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+                darkMode ? "bg-gray-900 border-gray-800" : "bg-white"
               }`}
             >
               Loading logs...
@@ -634,64 +691,61 @@ async function handleCreate(e: React.FormEvent) {
               {filtered.length === 0 ? (
                 <div
                   className={`p-8 rounded-lg border text-center ${
-                    darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+                    darkMode ? "bg-gray-900 border-gray-800" : "bg-white"
                   }`}
                 >
                   No logs found.
                 </div>
               ) : (
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {paged.map((log) => (
                     <Card
-                      key={log.id}
+                      key={log._id || log.id}
                       className={`p-4 rounded-xl border shadow-sm ${
                         darkMode
-                          ? "bg-gray-800 border-gray-700"
+                          ? "bg-gray-900 border-gray-800"
                           : "bg-white border-gray-200"
                       }`}
                     >
                       <div className="flex justify-between items-start gap-2">
+                        {/* LEFT CONTENT */}
                         <div>
-                          {/* TOP LEFT — ICON + TYPE + MACHINE */}
                           <div className="flex items-center gap-3">
                             <div
                               className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                darkMode ? "bg-gray-900" : "bg-gray-100"
+                                darkMode ? "bg-gray-800" : "bg-gray-100"
                               }`}
                             >
                               <FiDatabase className="h-5 w-5 text-indigo-500" />
                             </div>
 
                             <div>
-                              {/* TYPE */}
                               <div
-                                className={`font-semibold text-lg ${
+                                className={`font-semibold text-lg capitalize ${
                                   darkMode ? "text-white" : "text-gray-900"
                                 }`}
                               >
                                 {log.type || "—"}
                               </div>
 
-                              {/* MACHINE */}
                               <div className="text-sm text-gray-500">
                                 {log.machine_name ||
                                   machineName(log.machine_id)}
                               </div>
 
-                              {/* WORKER NAME — ADDED UNDER MACHINE */}
                               <div
                                 className={`text-xs mt-1 ${
                                   darkMode ? "text-gray-300" : "text-gray-700"
                                 }`}
                               >
-                                👷 {log.worker_name ||
+                                👷{" "}
+                                {log.worker_name ||
                                   workerName(log.worker_id) ||
                                   "No worker"}
                               </div>
                             </div>
                           </div>
 
-                          {/* NOTE */}
                           <div className="mt-3 text-sm">
                             <div
                               className={`${
@@ -703,32 +757,36 @@ async function handleCreate(e: React.FormEvent) {
                           </div>
                         </div>
 
-                        {/* RIGHT SIDE — ACTIONS */}
+                        {/* RIGHT CONTENT */}
                         <div className="flex flex-col items-end gap-2">
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs text-gray-500">
                             {formatDate(log.reported_at)}
                           </div>
 
                           <div className="flex gap-2">
                             <button
                               onClick={() => setViewing(log)}
-                              className="px-2 py-1 rounded-md border hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="px-2 py-1 rounded-md border text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
                             >
                               View
                             </button>
 
                             <button
                               onClick={() => openEdit(log)}
-                              className="px-2 py-1 rounded-md border hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="px-2 py-1 rounded-md border text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
                             >
                               <FiEdit2 />
                             </button>
 
                             <button
-                              onClick={() => handleDelete(log.id)}
-                              className="px-2 py-1 rounded-md border text-red-600 hover:bg-red-50"
+                              onClick={() =>
+                                handleDelete((log._id || log.id) as string)
+                              }
+                              className="px-2 py-1 rounded-md border text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
                             >
-                              {deletingId === log.id ? "Deleting..." : <FiTrash2 />}
+                              {deletingId === (log._id || log.id)
+                                ? "Deleting..."
+                                : <FiTrash2 />}
                             </button>
                           </div>
 
@@ -744,266 +802,20 @@ async function handleCreate(e: React.FormEvent) {
                 </div>
               )}
 
-              {/* FOOTER COUNTER */}
-              <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-gray-500">
+              <div className="flex items-center justify-between mt-6 text-sm text-gray-500">
+                <div>
                   Showing {(page - 1) * pageSize + 1}–
                   {Math.min(page * pageSize, filtered.length)} of{" "}
                   {filtered.length}
                 </div>
-                <div></div>
+                {/* You can add pagination controls here later */}
               </div>
             </>
           )}
         </section>
+
+        {/* VIEW MODAL / EDIT MODAL can be implemented later using `viewing` and `editing` state */}
       </main>
-
-      {/* VIEW MODAL */}
-      {viewing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setViewing(null)}
-          />
-          <div
-            className={`relative w-full max-w-3xl p-6 rounded-xl ${
-              darkMode ? "bg-gray-800" : "bg-white"
-            } z-10 shadow-2xl`}
-          >
-            <div className="flex justify-between items-start border-b pb-3 mb-4">
-              <div>
-                <h3 className="text-2xl font-bold text-blue-500">
-                  {viewing.type || "N/A"}
-                </h3>
-                <div className="text-base text-gray-500 mt-1">
-                  {viewing.machine_name || machineName(viewing.machine_id)}
-                </div>
-
-                {/* WORKER NAME HERE TOO */}
-                <div
-                  className={`mt-1 text-sm ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  👷 Worker: {workerName(viewing.worker_id)}
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setViewing(null);
-                    openEdit(viewing);
-                  }}
-                  className="px-3 py-1 rounded-lg border text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setViewing(null)}
-                  className="px-3 py-1 rounded-lg border text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-              <div>
-                <strong className="block">Worker</strong>
-                <div>{workerName(viewing.worker_id)}</div>
-              </div>
-
-              <div>
-                <strong className="block">Status</strong>
-                <div>
-                  {viewing.completed_at ? "Completed" : "Pending / In Progress"}
-                </div>
-              </div>
-
-              <div>
-                <strong className="block">Reported At</strong>
-                <div>{formatDate(viewing.reported_at)}</div>
-              </div>
-
-              <div>
-                <strong className="block">Completed At</strong>
-                <div>{formatDate(viewing.completed_at)}</div>
-              </div>
-
-              <div>
-                <strong className="block">Downtime</strong>
-                <div>
-                  {viewing.durationMinutes != null
-                    ? `${Math.round(viewing.durationMinutes)} minutes`
-                    : "Not completed"}
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <strong className="block">Notes</strong>
-                <div
-                  className={`mt-1 p-3 rounded-lg ${
-                    darkMode ? "bg-gray-900" : "bg-gray-50"
-                  } whitespace-pre-wrap`}
-                >
-                  {viewing.note || "No notes provided."}
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <strong className="block">Reading (JSON)</strong>
-                <pre
-                  className={`mt-1 p-3 rounded-lg text-xs overflow-auto ${
-                    darkMode ? "bg-gray-900" : "bg-gray-50"
-                  }`}
-                >
-                  {viewing.reading_value
-                    ? JSON.stringify(viewing.reading_value, null, 2)
-                    : "No readings logged."}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT MODAL */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setEditing(null)}
-          />
-          <div
-            className={`relative w-full max-w-2xl p-6 rounded-xl ${
-              darkMode ? "bg-gray-800" : "bg-white"
-            } z-10 shadow-xl`}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Edit Log</h3>
-              <button
-                onClick={() => setEditing(null)}
-                className="px-3 py-1 rounded border"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {/* MACHINE DROPDOWN */}
-              <div>
-                <Label>Machine</Label>
-                <select
-                  value={editing.machine_id || ""}
-                  onChange={(e) =>
-                    setEditing({ ...editing, machine_id: e.target.value })
-                  }
-                  className={inputClass}
-                >
-                  <option value="">— select —</option>
-                  {machinesList.map((m) => (
-                    <option key={m._id || m.id} value={m._id || m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="text-xs text-gray-500 mt-1">
-                  Current: {machineName(editing.machine_id)}
-                </div>
-              </div>
-
-              {/* COMPLETED TIME */}
-              <div>
-                <Label>Completed at</Label>
-                <input
-                  type="datetime-local"
-                  value={
-                    editing.completed_at
-                      ? editing.completed_at.slice(0, 16)
-                      : ""
-                  }
-                  onChange={(e) =>
-                    setEditing({ ...editing, completed_at: e.target.value })
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              {/* NOTES */}
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  value={editing.note || ""}
-                  onChange={(e: any) =>
-                    setEditing({ ...editing, note: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-
-              {/* READING */}
-              <div>
-                <Label>Reading (JSON)</Label>
-                <Textarea
-                  value={editing.reading_value as any}
-                  onChange={(e: any) =>
-                    setEditing({ ...editing, reading_value: e.target.value })
-                  }
-                  rows={4}
-                />
-              </div>
-
-              {/* SAVE BUTTON */}
-              <div className="flex justify-end gap-2 mt-3">
-                <button
-                  onClick={() => setEditing(null)}
-                  className="px-4 py-2 rounded border"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveEdit}
-                  className={`px-4 py-2 rounded ${
-                    saving ? "bg-gray-400" : "bg-blue-600 text-white"
-                  }`}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-/* ===========================================================
-   UTILITY FUNCTIONS (BOTTOM OF FILE)
-=========================================================== */
-
-function machineName(id: any) {
-  return id
-    ? machinesListGlobal.find((m) => m._id === id || m.id === id)?.name ||
-        "Unknown Machine"
-    : "Unknown / N/A";
-}
-
-function workerName(id: any) {
-  return id
-    ? workersListGlobal.find((w) => w._id === id || w.id === id)?.name ||
-        "Unknown Worker"
-    : "N/A";
-}
-
-function formatDate(dt: any) {
-  if (!dt) return "N/A";
-  const d = new Date(dt);
-  if (isNaN(d.getTime())) return "Invalid Date";
-  return d.toLocaleString();
-}
-
-/* GLOBAL ARRAYS to allow helpers to work */
-let machinesListGlobal: any[] = [];
-let workersListGlobal: any[] = [];

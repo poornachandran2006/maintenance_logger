@@ -100,36 +100,29 @@ const normalizeLogData = async (data) => {
 exports.getAllLogs = async (req, res) => {
     try {
         const q = {};
+
+        // Workers should only see their own logs
+        if (req.user.role !== "admin") {
+            q.reported_by = req.user.id;
+        }
+
+        // Optional filters
         if (req.query.type) q.type = req.query.type;
+
         if (req.query.machine_id && mongoose.Types.ObjectId.isValid(req.query.machine_id)) {
             q.machine_id = new mongoose.Types.ObjectId(req.query.machine_id);
         }
-        if (req.query.reported_by) q.reported_by = req.query.reported_by;
 
         const docs = await MaintenanceLog.find(q)
             .sort({ reported_at: -1 })
-            .exec(); 
+            .exec();
 
-        let formattedLogs = [];
-        for (const doc of docs) {
-            try {
-                formattedLogs.push(formatLog(doc));
-            } catch (e) {
-                if (e.name === 'CastError') {
-                    console.warn(`Skipping corrupted log with ID ${doc._id}: ${e.message}`);
-                } else {
-                    throw e; 
-                }
-            }
-        }
-        
-        res.json(formattedLogs);
-    } catch (error) {
-        console.error('getAllLogs err', error);
-        res.status(500).json({ message: 'Error fetching maintenance logs', error: error.message });
+        res.json(docs.map(formatLog));
+    } catch (err) {
+        console.error('getAllLogs err', err);
+        res.status(500).json({ message: 'Error fetching logs', error: err.message });
     }
 };
-
 
 const Attendance = require('../models/attendance.model'); // make sure path is correct
 

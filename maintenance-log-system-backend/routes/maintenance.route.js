@@ -2,23 +2,24 @@
 
 const express = require('express');
 const router = express.Router();
-// Renaming to maintenanceController for consistency
+
+const auth = require("../middleware/auth.middleware");
 const maintenanceController = require('../controllers/maintenance.controller'); 
 
-// Matches frontend: apiGet("/maintenance/get")
-router.get('/get', maintenanceController.getAllLogs); // Renamed function
+// GET all logs (protected)
+router.get('/get', auth, maintenanceController.getAllLogs);
 
-// Matches frontend: apiPost("/maintenance/create")
-router.post('/create', maintenanceController.createLog); // Renamed function
+// CREATE log (protected)
+router.post('/create', auth, maintenanceController.createLog);
 
-// Matches frontend: apiPut("/maintenance/update/:id")
-router.put('/update/:id', maintenanceController.updateLog); // Renamed function
-router.patch('/update/:id', maintenanceController.updateLog); // Added patch for flexibility
+// UPDATE log (protected)
+router.put('/update/:id', auth, maintenanceController.updateLog);
+router.patch('/update/:id', auth, maintenanceController.updateLog);
 
-// Matches frontend: apiDelete("/maintenance/:id")
-router.delete('/:id', maintenanceController.deleteLog); // Renamed function
+// DELETE log (protected)
+router.delete('/:id', auth, maintenanceController.deleteLog);
 
-// Added standard GET by ID route for completeness
-router.get('/:id', maintenanceController.getLogById); // Renamed function
+// GET log by ID (protected)
+router.get('/:id', auth, maintenanceController.getLogById);
 
 module.exports = router;
