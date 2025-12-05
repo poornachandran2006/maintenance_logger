@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
+
 import {
   Card,
   CardHeader,
@@ -11,11 +12,13 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+
 import { useTheme } from "@/lib/ThemeProvider";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -35,89 +38,103 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      // ⬇️ hit backend login route
       await apiPost("/auth/login", { email, password });
-
       toast.success("Login successful!");
-
-      // ⬇️ THIS IS THE IMPORTANT PART:
-      // after login, always go to the main website page
       router.push("/home");
     } catch (err: any) {
-      console.error("Login error", err);
-      toast.error(err.message || "Invalid credentials");
+      toast.error(err?.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className={`${darkMode ? "dark" : ""} min-h-screen w-full`}>
-      <div className="min-h-screen flex items-center justify-center px-4 py-10">
-        {/* Theme toggle */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
-          {darkMode ? (
-            <SunIcon className="h-5 w-5 text-amber-300" />
-          ) : (
-            <MoonIcon className="h-5 w-5 text-gray-600" />
-          )}
-        </div>
-
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">
-              Welcome Back 👋
-            </CardTitle>
-            <CardDescription>Sign in to continue</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={rememberMe}
-                  onCheckedChange={() => setRememberMe(!rememberMe)}
-                />
-                <Label>Remember me</Label>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </CardContent>
-
-          <CardFooter className="flex justify-center">
-            <p className="text-sm">
-              New user?{" "}
-              <Button variant="link" asChild>
-                <Link href="/signup">Create an account</Link>
-              </Button>
-            </p>
-          </CardFooter>
-        </Card>
+    <div
+      className={`min-h-screen flex items-center justify-center px-4 ${
+        darkMode
+          ? "bg-[#0b1220] text-white"
+          : "bg-gradient-to-b from-gray-100 to-gray-200"
+      }`}
+    >
+      {/* THEME TOGGLE */}
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
+        {darkMode ? (
+          <SunIcon className="h-5 w-5 text-yellow-300" />
+        ) : (
+          <MoonIcon className="h-5 w-5 text-gray-700" />
+        )}
       </div>
+
+      <Card
+        className={`w-full max-w-md shadow-xl rounded-2xl ${
+          darkMode ? "bg-[#111827]/60 backdrop-blur-xl" : "bg-white"
+        }`}
+      >
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-2xl font-bold">Welcome Back 👋</CardTitle>
+          <CardDescription className="mt-1">
+            Sign in to access the maintenance system
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="pt-2">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={darkMode ? "bg-gray-800 border-gray-700" : ""}
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={darkMode ? "bg-gray-800 border-gray-700" : ""}
+              />
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={rememberMe}
+                onCheckedChange={() => setRememberMe(!rememberMe)}
+              />
+              <Label>Remember me</Label>
+            </div>
+
+            {/* Button */}
+            <Button
+              type="submit"
+              className="w-full text-md py-3 rounded-lg"
+              disabled={loading}
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+        </CardContent>
+
+        <CardFooter className="flex justify-center pt-4 pb-6">
+          <p className="text-sm">
+            Don't have an account?{" "}
+            <Button variant="link" asChild className="px-1">
+              <Link href="/signup">Create Account</Link>
+            </Button>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

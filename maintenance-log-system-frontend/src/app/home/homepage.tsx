@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+
+// ⭐ AUTH GUARD
+import useAuthGuard from "../../lib/useAuthGuard";
+
+// ⭐ LOADING SPINNER
+import LoadingSpinner from "../_components/LoadingSpinner";
+
+// Icons
 import {
   FiActivity,
   FiDatabase,
@@ -9,13 +17,29 @@ import {
   FiLogIn,
   FiBarChart2,
 } from "react-icons/fi";
+
 import { LayoutDashboard, MoonIcon, SunIcon } from "lucide-react";
 import AuthButton from "../_components/auth-button";
 import Link from "next/link";
 
 export default function HomePage() {
+  // ⭐ FIRST HOOK: Auth Guard
+  const { user, loading } = useAuthGuard();
+
+  // ⭐ SECOND HOOKS (always after auth guard)
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
+
+  // ⭐ Loading screen
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // ⭐ No need for redirect here — useAuthGuard already handles it
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -51,7 +75,7 @@ export default function HomePage() {
           <div className="hidden md:flex space-x-6">
             <button
               onClick={() => setActiveTab("home")}
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-md transition-colors ${
                 activeTab === "home"
                   ? "text-blue-500 font-medium"
                   : darkMode
@@ -64,7 +88,7 @@ export default function HomePage() {
 
             <Link
               href="/features"
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-md transition-colors ${
                 activeTab === "features"
                   ? "text-blue-500 font-medium"
                   : darkMode
@@ -78,7 +102,7 @@ export default function HomePage() {
             <Link
               href="/solutions"
               onClick={() => setActiveTab("solutions")}
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-md transition-colors ${
                 activeTab === "solutions"
                   ? "text-blue-500 font-medium"
                   : darkMode
@@ -91,7 +115,7 @@ export default function HomePage() {
 
             <button
               onClick={() => setActiveTab("pricing")}
-              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-md transition-colors ${
                 activeTab === "pricing"
                   ? "text-blue-500 font-medium"
                   : darkMode
@@ -110,16 +134,17 @@ export default function HomePage() {
           <div className="flex items-center space-x-2">
             <button
               onClick={toggleDarkMode}
-              className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
+              className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors ${
                 darkMode ? "bg-blue-600" : "bg-gray-300"
               }`}
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
                   darkMode ? "translate-x-6" : "translate-x-0"
                 }`}
               />
             </button>
+
             {darkMode ? (
               <SunIcon className="h-5 w-5 text-yellow-300" />
             ) : (
@@ -128,16 +153,18 @@ export default function HomePage() {
           </div>
 
           {/* DASHBOARD BUTTON */}
-          <button
-            className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
-              darkMode
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600 text-white"
-            }`}
-          >
-            <LayoutDashboard className="h-5 w-5" />
-            <span>Dashboard</span>
-          </button>
+          <Link href="/dashboard">
+            <button
+              className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                darkMode
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-500 hover:bg-blue-600 text-white"
+              }`}
+            >
+              <LayoutDashboard className="h-5 w-5" />
+              <span>Dashboard</span>
+            </button>
+          </Link>
 
           {/* LOGIN / PROFILE BUTTON */}
           <AuthButton darkMode={darkMode} />
@@ -155,6 +182,7 @@ export default function HomePage() {
               <br />
               Made Simple
             </h1>
+
             <p
               className={`text-xl mb-8 ${
                 darkMode ? "text-gray-300" : "text-gray-600"
@@ -165,11 +193,12 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="bg-blue-600 cursor-pointer hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-medium transition-colors text-lg shadow-lg shadow-blue-500/20">
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg shadow-lg cursor-pointer">
                 Get Started Free
               </button>
+
               <button
-                className={`border px-8 py-4 rounded-lg font-medium cursor-pointer transition-colors text-lg ${
+                className={`border px-8 py-4 rounded-lg text-lg cursor-pointer transition-colors ${
                   darkMode
                     ? "border-gray-600 hover:bg-gray-800"
                     : "border-gray-300 hover:bg-gray-100"
@@ -180,7 +209,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Mock UI Section */}
+          {/* UI Mock Preview */}
           <div className="lg:w-1/2 relative">
             <div
               className={`border rounded-2xl p-6 shadow-2xl ${
@@ -210,7 +239,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Stats */}
+                {/* Stats Boxes */}
                 <div
                   className={`rounded-lg p-6 border mb-6 ${
                     darkMode
@@ -265,109 +294,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FEATURES SECTION */}
-      <section
-        className={`py-20 px-6 ${
-          darkMode ? "bg-gray-800/30" : "bg-gray-100"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">
-              Powerful Maintenance Tracking
-            </h2>
-            <p
-              className={`text-xl max-w-3xl mx-auto ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              Comprehensive features designed for industrial maintenance teams
-            </p>
-          </div>
-
-          {/* Feature Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <FiActivity className="h-8 w-8 text-blue-500" />,
-                title: "Real-time Monitoring",
-                description:
-                  "Track maintenance activities as they happen with live updates.",
-              },
-              {
-                icon: <FiUsers className="h-8 w-8 text-green-500" />,
-                title: "Team Collaboration",
-                description:
-                  "Assign tasks, share notes, and coordinate with teams.",
-              },
-              {
-                icon: <FiSettings className="h-8 w-8 text-purple-500" />,
-                title: "Equipment Management",
-                description:
-                  "Maintain detailed equipment records and maintenance logs.",
-              },
-              {
-                icon: <FiDatabase className="h-8 w-8 text-yellow-500" />,
-                title: "Data Analytics",
-                description:
-                  "Identify patterns and optimize your maintenance workflow.",
-              },
-              {
-                icon: <FiBarChart2 className="h-8 w-8 text-cyan-500" />,
-                title: "Custom Reports",
-                description:
-                  "Generate reports tailored to your organization's needs.",
-              },
-              {
-                icon: <FiLogIn className="h-8 w-8 text-red-500" />,
-                title: "Secure Access",
-                description:
-                  "Role-based permissions for maximum security.",
-              },
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className={`border rounded-xl p-8 hover:border-blue-500 transition-all duration-300 transform hover:scale-105 ${
-                  darkMode
-                    ? "bg-gray-800/50 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
-              >
-                <div
-                  className={`w-14 h-14 rounded-lg flex items-center justify-center mb-6 ${
-                    darkMode ? "bg-gray-900/50" : "bg-gray-100"
-                  }`}
-                >
-                  {feature.icon}
-                </div>
-
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p
-                  className={darkMode ? "text-gray-400" : "text-gray-600"}
-                >
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA SECTION */}
-      <section className="py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">
-            Ready to Transform Your Maintenance Operations?
-          </h2>
-          <p className="text-xl mb-8 text-blue-100">
-            Join hundreds of industrial teams who trust MaintenanceLog.
-          </p>
-          <button className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-bold transition-colors text-lg cursor-pointer shadow-lg">
-            Start Your Free Trial
-          </button>
-        </div>
-      </section>
-
       {/* FOOTER */}
       <footer
         className={`border-t py-12 px-6 ${
@@ -377,11 +303,7 @@ export default function HomePage() {
         }`}
       >
         <div className="max-w-7xl mx-auto text-center">
-          <p
-            className={`${
-              darkMode ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
+          <p className={`${darkMode ? "text-gray-400" : "text-gray-600"}`}>
             © {new Date().getFullYear()} MaintenanceLog. All rights reserved.
           </p>
         </div>

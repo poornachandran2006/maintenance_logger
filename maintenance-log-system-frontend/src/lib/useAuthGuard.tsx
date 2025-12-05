@@ -14,6 +14,7 @@ export type AuthUser = {
 export default function useAuthGuard() {
   const router = useRouter();
   const pathname = usePathname();
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,25 +26,21 @@ export default function useAuthGuard() {
         const res = await apiGet<{ user: AuthUser }>("/auth/me");
         setUser(res.user);
 
-        // ------------------------------
-        // ⭐ NEW LOGIC:
-        // Logged-in users should NOT see /signin or /signup
-        // ------------------------------
+        // ⭐ If logged-in user tries to visit signin/signup → redirect to /home
         if (PUBLIC_ROUTES.includes(pathname)) {
           router.replace("/home");
         }
-
       } catch (err) {
-        // User NOT logged in
         setUser(null);
 
-        // If the user visits ANY private route → send to signin
+        // ⭐ If not logged in and on a private page → redirect to signin
         if (!PUBLIC_ROUTES.includes(pathname)) {
           router.replace("/signin");
         }
-
       } finally {
-        setLoading(false);
+        // ⭐ VERY IMPORTANT — show loading spinner until check completes
+        setLoading(true);
+        setTimeout(() => setLoading(false), 300); // small delay for smooth UI
       }
     }
 

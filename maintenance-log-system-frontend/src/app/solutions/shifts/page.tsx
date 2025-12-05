@@ -184,6 +184,17 @@ export default function ShiftsPage() {
     }
   }
 
+  // 👉 NEW: label helper using PDF timings
+  const getShiftLabel = (s: Shift) => {
+    const lower = s.name.toLowerCase();
+    if (lower.includes("shift 1")) return "Shift 1 (06:00 – 14:30)";
+    if (lower.includes("shift 2")) return "Shift 2 (14:30 – 23:00)";
+    if (lower.includes("shift 3")) return "Shift 3 (23:00 – 06:00)";
+    if (lower.includes("general")) return "General Shift (08:30 – 17:00)";
+    // fallback
+    return s.name;
+  };
+
   // FILTERS
   const filteredAttendance = useMemo(() => {
     let out = [...attendance];
@@ -244,119 +255,117 @@ export default function ShiftsPage() {
     >
       {/* NAVBAR */}
       <nav
-              className={`border-b fixed w-full px-6 py-4 flex items-center justify-between z-50 ${
-                darkMode
-                  ? "bg-gray-800/50 border-gray-700"
-                  : "bg-white/80 border-gray-200"
+        className={`border-b fixed w-full px-6 py-4 flex items-center justify-between z-50 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700"
+            : "bg-white/80 border-gray-200"
+        }`}
+      >
+        <div className="flex items-center space-x-8">
+          <div className="flex items-center">
+            <div className="bg-blue-500 p-2 rounded-lg">
+              <FiActivity className="h-6 w-6 text-white" />
+            </div>
+            <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">
+              MaintenanceLog
+            </span>
+          </div>
+
+          <div className="hidden md:flex space-x-6">
+            <Link
+              href="/"
+              onClick={() => setActiveTab("home")}
+              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                activeTab === "home"
+                  ? "text-blue-500 font-medium"
+                  : darkMode
+                  ? "hover:text-gray-300"
+                  : "hover:text-gray-700"
               }`}
             >
-              <div className="flex items-center space-x-8">
-                <div className="flex items-center">
-                  <div className="bg-blue-500 p-2 rounded-lg">
-                    <FiActivity className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">
-                    MaintenanceLog
-                  </span>
-                </div>
-      
-                <div className="hidden md:flex space-x-6">
-                  <Link
-                    href="/"
-                    onClick={() => setActiveTab("home")}
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                      activeTab === "home"
-                        ? "text-blue-500 font-medium"
-                        : darkMode
-                        ? "hover:text-gray-300"
-                        : "hover:text-gray-700"
-                    }`}
-                  >
-                    Home
-                  </Link>
-                  <Link
-                    href="/features"
-                    onClick={() => setActiveTab("features")}
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                      activeTab === "features"
-                        ? "text-blue-500 font-medium"
-                        : darkMode
-                        ? "hover:text-gray-300"
-                        : "hover:text-gray-700"
-                    }`}
-                  >
-                    Features
-                  </Link>
-                  <Link
-                    href="/solutions"
-                    onClick={() => setActiveTab("solutions")}
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                      activeTab === "solutions"
-                        ? "text-blue-500 font-medium"
-                        : darkMode
-                        ? "hover:text-gray-300"
-                        : "hover:text-gray-700"
-                    }`}
-                  >
-                    Solutions
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    onClick={() => setActiveTab("pricing")}
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                      activeTab === "pricing"
-                        ? "text-blue-500 font-medium"
-                        : darkMode
-                        ? "hover:text-gray-300"
-                        : "hover:text-gray-700"
-                    }`}
-                  >
-                    Pricing
-                  </Link>
-                </div>
-              </div>
-      
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  {/* Only render the proper toggle after client hydration */}
-                  {isMounted && (
-                    <button
-                      onClick={handleDarkToggle}
-                      className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
-                        darkMode ? "bg-blue-600" : "bg-gray-300"
-                      }`}
-                    >
-                      <div
-                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                          darkMode ? "translate-x-6" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  )}
-      
-                  {darkMode ? (
-                    <SunIcon className="h-5 w-5 text-yellow-300" />
-                  ) : (
-                    <MoonIcon className="h-5 w-5 text-gray-600" />
-                  )}
-                </div>
-      
-                <Link
-                  href="/dashboard"
-                  className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
-                    darkMode
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-blue-500 hover:bg-blue-600 text-white"
+              Home
+            </Link>
+            <Link
+              href="/features"
+              onClick={() => setActiveTab("features")}
+              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                activeTab === "features"
+                  ? "text-blue-500 font-medium"
+                  : darkMode
+                  ? "hover:text-gray-300"
+                  : "hover:text-gray-700"
+              }`}
+            >
+              Features
+            </Link>
+            <Link
+              href="/solutions"
+              onClick={() => setActiveTab("solutions")}
+              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                activeTab === "solutions"
+                  ? "text-blue-500 font-medium"
+                  : darkMode
+                  ? "hover:text-gray-300"
+                  : "hover:text-gray-700"
+              }`}
+            >
+              Solutions
+            </Link>
+            <Link
+              href="/pricing"
+              onClick={() => setActiveTab("pricing")}
+              className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                activeTab === "pricing"
+                  ? "text-blue-500 font-medium"
+                  : darkMode
+                  ? "hover:text-gray-300"
+                  : "hover:text-gray-700"
+              }`}
+            >
+              Pricing
+            </Link>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            {isMounted && (
+              <button
+                onClick={handleDarkToggle}
+                className={`w-12 h-6 flex items-center rounded-full cursor-pointer p-1 transition-colors duration-300 ${
+                  darkMode ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                    darkMode ? "translate-x-6" : "translate-x-0"
                   }`}
-                >
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span>Dashboard</span>
-                </Link>
-      
-                {/* Hydration-safe AuthButton */}
-                {isMounted && <AuthButton darkMode={darkMode} />}
-              </div>
-            </nav>
+                />
+              </button>
+            )}
+
+            {darkMode ? (
+              <SunIcon className="h-5 w-5 text-yellow-300" />
+            ) : (
+              <MoonIcon className="h-5 w-5 text-gray-600" />
+            )}
+          </div>
+
+          <Link
+            href="/dashboard"
+            className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+              darkMode
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-blue-500 hover:bg-blue-600 text-white"
+            }`}
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span>Dashboard</span>
+          </Link>
+
+          {isMounted && <AuthButton darkMode={darkMode} />}
+        </div>
+      </nav>
 
       {/* BODY */}
       <main className="pt-28 px-6 max-w-6xl mx-auto">
@@ -408,18 +417,17 @@ export default function ShiftsPage() {
                   </Label>
 
                   <input
-  type="text"
-  value={attendanceForm.worker_id}
-  onChange={(e) =>
-    setAttendanceForm((s) => ({
-      ...s,
-      worker_id: e.target.value,
-    }))
-  }
-  placeholder="Enter worker name"
-  className={inputClass + " h-11"}
-/>
-
+                    type="text"
+                    value={attendanceForm.worker_id}
+                    onChange={(e) =>
+                      setAttendanceForm((s) => ({
+                        ...s,
+                        worker_id: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter worker name"
+                    className={inputClass + " h-11"}
+                  />
                 </div>
 
                 {/* Shift */}
@@ -440,7 +448,7 @@ export default function ShiftsPage() {
                     <option value="">— select shift —</option>
                     {shifts.map((s) => (
                       <option key={s.id || s._id} value={s.id || s._id}>
-                        {s.name}
+                        {getShiftLabel(s)}
                       </option>
                     ))}
                   </select>
@@ -500,7 +508,7 @@ export default function ShiftsPage() {
             <option value="all">All Shifts</option>
             {shifts.map((s) => (
               <option key={s.id || s._id} value={s.id || s._id}>
-                {s.name}
+                {getShiftLabel(s)}
               </option>
             ))}
           </select>
@@ -573,7 +581,7 @@ export default function ShiftsPage() {
                             darkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          <div>Shift: {shift?.name}</div>
+                          <div>Shift: {shift ? getShiftLabel(shift) : "-"}</div>
                           <div>Check-in: {formatTime(r.check_in)}</div>
                           <div>Check-out: {formatTime(r.check_out)}</div>
                         </div>
@@ -611,7 +619,8 @@ export default function ShiftsPage() {
                                 () =>
                                   setAttendance((s) =>
                                     s.filter(
-                                      (x) => (x.id || x._id) !== (r.id || r._id)
+                                      (x) =>
+                                        (x.id || x._id) !== (r.id || r._id)
                                     )
                                   )
                               );
