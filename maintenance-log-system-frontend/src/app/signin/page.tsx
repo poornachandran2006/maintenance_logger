@@ -21,12 +21,16 @@ import { Label } from "@/components/ui/label";
 
 import { useTheme } from "@/lib/ThemeProvider";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiPost } from "@/lib/api";
 
 export default function SignInPage() {
   const { darkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
+  const params = useSearchParams();
+
+  // If middleware redirected user, we get the original path from query
+  const redirectTo = params.get("from") || "/home";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,8 +43,9 @@ export default function SignInPage() {
 
     try {
       await apiPost("/auth/login", { email, password });
+
       toast.success("Login successful!");
-      router.push("/home");
+      router.push(redirectTo); // 🔥 Redirect user back to original protected page
     } catch (err: any) {
       toast.error(err?.message || "Invalid credentials");
     } finally {

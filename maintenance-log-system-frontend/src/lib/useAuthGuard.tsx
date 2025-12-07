@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { apiGet } from "./api";
 
 export type AuthUser = {
@@ -11,41 +10,51 @@ export type AuthUser = {
   role: string;
 };
 
+/**
+ * useAuthGuard (middleware-friendly)
+ *
+ * - DOES NOT redirect. Middleware / server pages handle redirects.
+ * - Loads current user via GET /auth/me (uses cookie via apiGet which includes credentials).
+ * - Exposes `refreshAuth()` so callers can re-check after login/logout.
+ */
 export default function useAuthGuard() {
-  const router = useRouter();
-  const pathname = usePathname();
-
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const PUBLIC_ROUTES = ["/signin", "/signup"];
-
-  useEffect(() => {
-    async function validateSession() {
-      try {
-        const res = await apiGet<{ user: AuthUser }>("/auth/me");
-        setUser(res.user);
-
-        // ⭐ If logged-in user tries to visit signin/signup → redirect to /home
-        if (PUBLIC_ROUTES.includes(pathname)) {
-          router.replace("/home");
-        }
-      } catch (err) {
-        setUser(null);
-
-        // ⭐ If not logged in and on a private page → redirect to signin
-        if (!PUBLIC_ROUTES.includes(pathname)) {
-          router.replace("/signin");
-        }
-      } finally {
-        // ⭐ VERY IMPORTANT — show loading spinner until check completes
-        setLoading(true);
-        setTimeout(() => setLoading(false), 300); // small delay for smooth UI
-      }
+  const fetchUser = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await apiGet<{ user: AuthUser }>("/auth/me");
+      if (signal?.aborted) return;
+      setUser(res?.user ?? null);
+    } catch (err) {
+      if (signal?.aborted) return;
+      setUser(null);
+    } finally {
+      if (signal && signal.aborted) return;
+      setLoading(false);
     }
+  }, []);
 
-    validateSession();
-  }, [pathname, router]);
+  // Initial load
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    fetchUser(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [fetchUser]);
 
-  return { user, loading };
+  // Refresh helper for consumers
+  const refreshAuth = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetchUser();
+    } finally {
+      // fetchUser sets loading=false in finally, but keep this as safe fallback
+      setLoading(false);
+    }
+  }, [fetchUser]);
+
+  return { user, loading, refreshAuth };
 }

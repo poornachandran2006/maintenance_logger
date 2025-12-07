@@ -3,13 +3,14 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const cookieParser = require("cookie-parser"); // ⭐ REQUIRED for cookies
 
 dotenv.config();
 
 const app = express();
 
 /* -------------------------------------------------------
-   CORS CONFIG
+   CORS CONFIG  ✅ FIXED
 ------------------------------------------------------- */
 
 const allowedOrigins = [
@@ -20,14 +21,19 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // ⭐ IMPORTANT FIX:
+    // Allow SSR requests, Postman, and any request without an Origin header
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.log("❌ CORS Blocked Origin:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true,
+
+  credentials: true, // ⭐ REQUIRED for cookies
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
@@ -35,6 +41,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // ⭐ must be after CORS
 
 /* -------------------------------------------------------
    HELPER: SAFE ROUTE LOADING
@@ -56,14 +63,14 @@ function safeLoadRoute(path) {
 const maintenanceRoutes = safeLoadRoute("./routes/maintenance.route");
 const machinesRoutes = safeLoadRoute("./routes/machines.route");
 const analyticsRoutes = safeLoadRoute("./routes/analytics.route");
-const authRoutes = safeLoadRoute("./routes/auth.route");   // Updated
+const authRoutes = safeLoadRoute("./routes/auth.route");
 const fileRoutes = safeLoadRoute("./routes/file.route");
 const usersRoutes = safeLoadRoute("./routes/users.route");
 const shiftsRoutes = safeLoadRoute("./routes/shifts.route.js");
 const attendanceRoutes = safeLoadRoute("./routes/attendance.route");
 
 /* -------------------------------------------------------
-   DEBUG ROUTE LOG
+   DEBUG ROUTE LOGGING
 ------------------------------------------------------- */
 
 console.log("ROUTE LOADING STATUS:");
@@ -102,8 +109,8 @@ if (machinesRoutes && checkRouter("machinesRoutes", machinesRoutes))
 if (analyticsRoutes && checkRouter("analyticsRoutes", analyticsRoutes))
   app.use("/api/analytics", analyticsRoutes);
 
-if (authRoutes && checkRouter("authRoutes", authRoutes)) 
-  app.use("/api/auth", authRoutes);       // Updated
+if (authRoutes && checkRouter("authRoutes", authRoutes))
+  app.use("/api/auth", authRoutes);
 
 if (fileRoutes && checkRouter("fileRoutes", fileRoutes))
   app.use("/api/file", fileRoutes);

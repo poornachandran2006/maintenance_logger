@@ -38,27 +38,17 @@ async function handleResponse<T = any>(res: Response): Promise<T> {
 }
 
 // ----------------------------------------------------
-// GET TOKEN FROM LOCAL STORAGE
-// ----------------------------------------------------
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
-
-// ----------------------------------------------------
-// CORE REQUEST HANDLER
+// CORE REQUEST HANDLER — NOW COOKIE BASED
 // ----------------------------------------------------
 async function request<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
-
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
+    credentials: "include",                     // 🔥 IMPORTANT!
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
