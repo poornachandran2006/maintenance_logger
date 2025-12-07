@@ -7,9 +7,8 @@ import HomeClient from "./HomeClient";
 export default function HomePage() {
   const cookieStore = cookies();
 
-  // Fix: store cookie in a variable with explicit optional type
-  const tokenCookie = cookieStore.get("token") as { value: string } | undefined;
-
+  // Fix: Save the result first so TS understands the type
+  const tokenCookie = cookieStore.get("token");
   const token = tokenCookie?.value;
 
   if (!token) {
